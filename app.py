@@ -54,7 +54,7 @@ app.layout = dbc.Container([
                 dbc.CardBody([
                     html.H4("Patient Demographic", className="card-title"),
                     dcc.Dropdown(
-                        id="demographic-dropdown",
+                        id="gender-filter",
                         options=[{"label": gender, "value": gender} for gender in data["Gender"].unique()],
                         value=None,
                         placeholder="Select a gender"
@@ -93,7 +93,10 @@ app.layout = dbc.Container([
                     dcc.Slider(
                         id='billing-slider',
                         min = data['Billing Amount'].min(),
-                        max = data['Billing Amount'].max()
+                        max = data['Billing Amount'].max(),
+                        value = data['Billing Amount'].mean(),
+                        marks = {int(value): f"${int(value):,}" for value in data['Billing Amount'].quantile([0, 0.25, 0.5, 0.75, 1]).values},
+                        step=10
                     ),
                     dcc.Graph(id="billing-distribution")
                 ])
@@ -108,13 +111,53 @@ app.layout = dbc.Container([
                 dbc.CardBody([
                     html.H4("Trends in Admission Over Time", className="card-title"),
                     dcc.Graph(id="admission-trends"),
-                    dcc.RadioItems(id="chart-type")
+                    dcc.RadioItems(
+                        id="chart-type",
+                        options =[
+                            {"label":"Line Chart","value": "line"},
+                            {"label":"Bar Chart", "value": "bar"}
+                        ],
+                        value="line",
+                        inline=True,
+                        className="mb-4"
+                    ),
+
+                    dcc.Dropdown(
+                        id="condition-filter",
+                        options=[{"label": condition, "value": condition} for condition in data["Medical Condition"].unique()]
+                    )
                 ])
             ])
-        ], width=12)
+        ])
     ])
 
-])
+], fluid=True)
+
+# Prepare Callbacks
+@app.callback(
+    Output('age-distribution', 'figure'),
+    Input('gender-filter', 'value')
+)
+def update_distribution(selected_gender):
+    if selected_gender:
+        filtered_df = data[data["Gender"]== selected_gender]
+    else:
+        filtered_df = data
+
+    if filtered_df.empty:
+        return {}
+    
+    fig = px.histogram(
+        filtered_df,
+        x="Age",
+        nbins=10,
+        color="Gender",
+        title="Age Distribution by Gender",
+        color_discrete_sequence=["blue", "pink"]
+    )
+    
+    return fig
+
 
 if __name__ =='__main__':
     app.run(debug=True)
